@@ -1,0 +1,458 @@
+//@version=6
+indicator('ICT', overlay = true, max_lines_count = 50, max_labels_count = 50)
+
+// ============================== ON / OFF ==============================
+grpToggles = 'On / Off'
+
+showAsiaHigh = input.bool(true, 'Asia High', group = grpToggles, inline = 'asia')
+showAsiaLow = input.bool(true, 'Asia Low', group = grpToggles, inline = 'asia')
+showLondonHigh = input.bool(true, 'London High', group = grpToggles, inline = 'london')
+showLondonLow = input.bool(true, 'London Low', group = grpToggles, inline = 'london')
+showMidnightOpen = input.bool(true, 'Midnight Open', group = grpToggles, inline = 'opens', tooltip = 'Price at the Midnight Open and 08:30 Open (NY), extended right')
+showOpen2 = input.bool(true, '08:30 Open', group = grpToggles, inline = 'opens')
+showPDH = input.bool(true, 'Prev Day High', group = grpToggles, inline = 'pd')
+showPDL = input.bool(true, 'Prev Day Low', group = grpToggles, inline = 'pd')
+showPWH = input.bool(true, 'Prev Week High', group = grpToggles, inline = 'pw')
+showPWL = input.bool(true, 'Prev Week Low', group = grpToggles, inline = 'pw')
+extendRight = input.bool(true, 'Extend Lines To The Right', group = grpToggles, tooltip = 'On = lines follow price and end where the text sits. Off = lines stop a fixed number of bars after the RTH open.')
+showLabelBackground = input.bool(false, 'Show Label Background', group = grpToggles)
+// ======================================================================
+
+
+// ============================== GENERAL ===============================
+grpGeneral = 'General'
+
+asiaSession = input.session('1800-0150', 'Asia Session (NY Time)', group = grpGeneral)
+londonSession = input.session('0200-0930', 'London Session (NY Time)', group = grpGeneral)
+sessionTz = input.string('America/New_York', 'Session Time Zone', group = grpGeneral)
+lineWidth = input.int(1, 'Line Width', minval = 1, maxval = 10, group = grpGeneral)
+extendBars = input.int(120, 'Line Length After RTH Open (Bars)', minval = 1, maxval = 1000, group = grpGeneral, tooltip = 'Only used when Extend Lines To The Right is off')
+// ======================================================================
+
+
+// ============================== LABELS ================================
+grpLabels = 'Labels'
+
+labelTextColor = input.color(color.rgb(66, 64, 64), 'Label Text Color', group = grpLabels)
+labelSizeInput = input.int(2, 'Label Size: 0=tiny, 1=small, 2=normal, 3=large, 4=huge', minval = 0, maxval = 4, group = grpLabels)
+labelOffsetTicks = input.int(0, 'Label Offset Below Line (Ticks)', minval = 0, group = grpLabels)
+labelOffsetBars = input.int(40, 'Label Distance Right Of Last Bar (Bars)', minval = 0, maxval = 500, group = grpLabels, tooltip = 'How far to the right of the current bar the text sits. 0 = right on the last bar.')
+// ======================================================================
+
+
+// =========================== ASIA / LONDON ============================
+grpSessions = 'Asia / London'
+
+asiaHighColor = input.color(color.new(color.teal, 0), 'Asia High Color', group = grpSessions)
+asiaLowColor = input.color(color.new(color.teal, 0), 'Asia Low Color', group = grpSessions)
+asiaHighText = input.string('Asia High', 'Asia High Text', group = grpSessions)
+asiaLowText = input.string('Asia Low', 'Asia Low Text', group = grpSessions)
+asiaLabelBgColor = input.color(color.new(color.teal, 0), 'Asia Label Background', group = grpSessions)
+
+londonHighColor = input.color(color.new(color.orange, 0), 'London High Color', group = grpSessions)
+londonLowColor = input.color(color.new(color.orange, 0), 'London Low Color', group = grpSessions)
+londonHighText = input.string('London High', 'London High Text', group = grpSessions)
+londonLowText = input.string('London Low', 'London Low Text', group = grpSessions)
+londonLabelBgColor = input.color(color.new(color.orange, 0), 'London Label Background', group = grpSessions)
+// ======================================================================
+
+
+// ============================== NY OPENS ==============================
+grpOpens = 'NY Opens'
+
+midnightHour = input.int(0, 'Midnight Open Hour (NY)', minval = 0, maxval = 23, group = grpOpens)
+midnightMinute = input.int(0, 'Midnight Open Minute', minval = 0, maxval = 59, group = grpOpens)
+midnightColor = input.color(color.new(#7eceb6, 0), 'Midnight Open Color', group = grpOpens)
+midnightText = input.string('Midnight Open', 'Midnight Open Text', group = grpOpens)
+midnightBgColor = input.color(color.new(#99dec9, 0), 'Midnight Label Background', group = grpOpens)
+
+open2Hour = input.int(8, '08:30 Open Hour (NY)', minval = 0, maxval = 23, group = grpOpens)
+open2Minute = input.int(30, '08:30 Open Minute', minval = 0, maxval = 59, group = grpOpens)
+open2Color = input.color(color.new(#4075d1, 0), '08:30 Open Color', group = grpOpens)
+open2Text = input.string('8:30 Open', '08:30 Open Text', group = grpOpens)
+open2BgColor = input.color(color.new(#4075d1, 0), '08:30 Label Background', group = grpOpens)
+
+openLineWidth = input.int(1, 'Open Line Width', minval = 1, maxval = 10, group = grpOpens)
+openLineStyleInput = input.string('Dashed', 'Open Line Style', options = ['Solid', 'Dashed', 'Dotted'], group = grpOpens)
+// ======================================================================
+
+
+// ======================= PREVIOUS DAY / WEEK ==========================
+grpPrev = 'Previous Day / Week'
+
+pdhColor = input.color(color.new(#27b06c, 0), 'Previous Day High Color', group = grpPrev)
+pdlColor = input.color(color.new(#27b06c, 0), 'Previous Day Low Color', group = grpPrev)
+pwhColor = input.color(color.new(color.blue, 0), 'Previous Week High Color', group = grpPrev)
+pwlColor = input.color(color.new(color.blue, 0), 'Previous Week Low Color', group = grpPrev)
+
+pdhText = input.string('PDHs', 'Previous Day High Text', group = grpPrev)
+pdlText = input.string('PDLs', 'Previous Day Low Text', group = grpPrev)
+pwhText = input.string('PWHs', 'Previous Week High Text', group = grpPrev)
+pwlText = input.string('PWLs', 'Previous Week Low Text', group = grpPrev)
+
+prevDayBgColor = input.color(color.new(#27b06c, 0), 'Previous Day Label Background', group = grpPrev)
+prevWeekBgColor = input.color(color.new(color.blue, 0), 'Previous Week Label Background', group = grpPrev)
+// ======================================================================
+
+
+inAsia = not na(time(timeframe.period, asiaSession, sessionTz))
+inLondon = not na(time(timeframe.period, londonSession, sessionTz))
+
+asiaStart = inAsia and not inAsia[1]
+asiaEnd = not inAsia and inAsia[1]
+londonStart = inLondon and not inLondon[1]
+londonEnd = not inLondon and inLondon[1]
+
+var float asiaHigh = na
+var float asiaLow = na
+var float londonHigh = na
+var float londonLow = na
+
+var int asiaHighBar = na
+var int asiaLowBar = na
+var int londonHighBar = na
+var int londonLowBar = na
+
+var line asiaHighLine = na
+var line asiaLowLine = na
+var line londonHighLine = na
+var line londonLowLine = na
+
+var label asiaHighLabel = na
+var label asiaLowLabel = na
+var label londonHighLabel = na
+var label londonLowLabel = na
+
+asiaLabelColor = showLabelBackground ? asiaLabelBgColor : color.new(color.white, 100)
+londonLabelColor = showLabelBackground ? londonLabelBgColor : color.new(color.white, 100)
+labelOffsetPrice = syminfo.mintick * labelOffsetTicks
+labelSize = labelSizeInput == 0 ? size.tiny : labelSizeInput == 1 ? size.small : labelSizeInput == 2 ? size.normal : labelSizeInput == 3 ? size.large : size.huge
+
+if asiaStart
+    asiaHigh := high
+    asiaLow := low
+    asiaHighBar := bar_index
+    asiaLowBar := bar_index
+    asiaLowBar
+else if inAsia
+    if high >= nz(asiaHigh, high)
+        asiaHigh := high
+        asiaHighBar := bar_index
+        asiaHighBar
+    if low <= nz(asiaLow, low)
+        asiaLow := low
+        asiaLowBar := bar_index
+        asiaLowBar
+
+if londonStart
+    londonHigh := high
+    londonLow := low
+    londonHighBar := bar_index
+    londonLowBar := bar_index
+    londonLowBar
+else if inLondon
+    if high >= nz(londonHigh, high)
+        londonHigh := high
+        londonHighBar := bar_index
+        londonHighBar
+    if low <= nz(londonLow, low)
+        londonLow := low
+        londonLowBar := bar_index
+        londonLowBar
+
+// lines + text are drawn when the session starts and follow the developing high/low while the session is still running
+if asiaStart
+    line.delete(asiaHighLine)
+    line.delete(asiaLowLine)
+    label.delete(asiaHighLabel)
+    label.delete(asiaLowLabel)
+
+    asiaHighLine := na
+    asiaLowLine := na
+    asiaHighLabel := na
+    asiaLowLabel := na
+
+    if showAsiaHigh
+        asiaHighEnd = extendRight ? bar_index + labelOffsetBars : asiaHighBar + extendBars
+        asiaHighLine := line.new(asiaHighBar, asiaHigh, asiaHighEnd, asiaHigh, color = asiaHighColor, width = lineWidth, extend = extend.none)
+        asiaHighLabel := label.new(bar_index + labelOffsetBars, asiaHigh - labelOffsetPrice, asiaHighText, style = label.style_label_left, textcolor = labelTextColor, color = asiaLabelColor, size = labelSize)
+        asiaHighLabel
+    if showAsiaLow
+        asiaLowEnd = extendRight ? bar_index + labelOffsetBars : asiaLowBar + extendBars
+        asiaLowLine := line.new(asiaLowBar, asiaLow, asiaLowEnd, asiaLow, color = asiaLowColor, width = lineWidth, extend = extend.none)
+        asiaLowLabel := label.new(bar_index + labelOffsetBars, asiaLow - labelOffsetPrice, asiaLowText, style = label.style_label_left, textcolor = labelTextColor, color = asiaLabelColor, size = labelSize)
+        asiaLowLabel
+else if inAsia
+    if not na(asiaHighLine)
+        line.set_xy1(asiaHighLine, asiaHighBar, asiaHigh)
+        line.set_y2(asiaHighLine, asiaHigh)
+        if not extendRight
+            line.set_x2(asiaHighLine, asiaHighBar + extendBars)
+    if not na(asiaLowLine)
+        line.set_xy1(asiaLowLine, asiaLowBar, asiaLow)
+        line.set_y2(asiaLowLine, asiaLow)
+        if not extendRight
+            line.set_x2(asiaLowLine, asiaLowBar + extendBars)
+
+if londonStart
+    line.delete(londonHighLine)
+    line.delete(londonLowLine)
+    label.delete(londonHighLabel)
+    label.delete(londonLowLabel)
+
+    londonHighLine := na
+    londonLowLine := na
+    londonHighLabel := na
+    londonLowLabel := na
+
+    if showLondonHigh
+        londonHighEnd = extendRight ? bar_index + labelOffsetBars : londonHighBar + extendBars
+        londonHighLine := line.new(londonHighBar, londonHigh, londonHighEnd, londonHigh, color = londonHighColor, width = lineWidth, extend = extend.none)
+        londonHighLabel := label.new(bar_index + labelOffsetBars, londonHigh - labelOffsetPrice, londonHighText, style = label.style_label_left, textcolor = labelTextColor, color = londonLabelColor, size = labelSize)
+        londonHighLabel
+    if showLondonLow
+        londonLowEnd = extendRight ? bar_index + labelOffsetBars : londonLowBar + extendBars
+        londonLowLine := line.new(londonLowBar, londonLow, londonLowEnd, londonLow, color = londonLowColor, width = lineWidth, extend = extend.none)
+        londonLowLabel := label.new(bar_index + labelOffsetBars, londonLow - labelOffsetPrice, londonLowText, style = label.style_label_left, textcolor = labelTextColor, color = londonLabelColor, size = labelSize)
+        londonLowLabel
+else if inLondon
+    if not na(londonHighLine)
+        line.set_xy1(londonHighLine, londonHighBar, londonHigh)
+        line.set_y2(londonHighLine, londonHigh)
+        if not extendRight
+            line.set_x2(londonHighLine, londonHighBar + extendBars)
+    if not na(londonLowLine)
+        line.set_xy1(londonLowLine, londonLowBar, londonLow)
+        line.set_y2(londonLowLine, londonLow)
+        if not extendRight
+            line.set_x2(londonLowLine, londonLowBar + extendBars)
+
+// ================= NY OPEN LEVELS (00:00 and 08:30 NY) =================
+openLineStyle = openLineStyleInput == 'Solid' ? line.style_solid : openLineStyleInput == 'Dashed' ? line.style_dashed : line.style_dotted
+midnightLabelColor = showLabelBackground ? midnightBgColor : color.new(color.white, 100)
+open2LabelColor = showLabelBackground ? open2BgColor : color.new(color.white, 100)
+
+nyMinuteOfDay = hour(time, sessionTz) * 60 + minute(time, sessionTz)
+newNyDay = na(time[1]) or dayofmonth(time, sessionTz) != dayofmonth(time[1], sessionTz)
+
+midnightTarget = midnightHour * 60 + midnightMinute
+open2Target = open2Hour * 60 + open2Minute
+
+// first bar of the NY day at or after the target time
+midnightTrigger = newNyDay ? nyMinuteOfDay >= midnightTarget : nyMinuteOfDay >= midnightTarget and nyMinuteOfDay[1] < midnightTarget
+open2Trigger = newNyDay ? nyMinuteOfDay >= open2Target : nyMinuteOfDay >= open2Target and nyMinuteOfDay[1] < open2Target
+
+var float midnightPrice = na
+var float open2Price = na
+var line midnightLine = na
+var line open2Line = na
+var label midnightLabel = na
+var label open2Label = na
+
+if midnightTrigger
+    midnightPrice := open
+    line.delete(midnightLine)
+    label.delete(midnightLabel)
+    midnightLine := na
+    midnightLabel := na
+
+    if showMidnightOpen
+        midnightEnd = extendRight ? bar_index + labelOffsetBars : bar_index + extendBars
+        midnightLine := line.new(bar_index, midnightPrice, midnightEnd, midnightPrice, color = midnightColor, width = openLineWidth, style = openLineStyle, extend = extend.none)
+        midnightLabel := label.new(bar_index + labelOffsetBars, midnightPrice - labelOffsetPrice, midnightText, style = label.style_label_left, textcolor = labelTextColor, color = midnightLabelColor, size = labelSize)
+        midnightLabel
+
+if open2Trigger
+    open2Price := open
+    line.delete(open2Line)
+    label.delete(open2Label)
+    open2Line := na
+    open2Label := na
+
+    if showOpen2
+        open2End = extendRight ? bar_index + labelOffsetBars : bar_index + extendBars
+        open2Line := line.new(bar_index, open2Price, open2End, open2Price, color = open2Color, width = openLineWidth, style = openLineStyle, extend = extend.none)
+        open2Label := label.new(bar_index + labelOffsetBars, open2Price - labelOffsetPrice, open2Text, style = label.style_label_left, textcolor = labelTextColor, color = open2LabelColor, size = labelSize)
+        open2Label
+
+if not showMidnightOpen and not na(midnightLine)
+    line.delete(midnightLine)
+    label.delete(midnightLabel)
+    midnightLine := na
+    midnightLabel := na
+    midnightLabel
+
+if not showOpen2 and not na(open2Line)
+    line.delete(open2Line)
+    label.delete(open2Label)
+    open2Line := na
+    open2Label := na
+    open2Label
+    // =======================================================================
+
+
+// ==================== PREVIOUS DAY / WEEK HIGH & LOW ====================
+prevDayLabelColor = showLabelBackground ? prevDayBgColor : color.new(color.white, 100)
+prevWeekLabelColor = showLabelBackground ? prevWeekBgColor : color.new(color.white, 100)
+
+newDay = timeframe.change('D')
+newWeek = timeframe.change('W')
+
+// running high/low of the current day and week (with the bar where each was made)
+var float curDayHigh = na
+var float curDayLow = na
+var int curDayHighBar = na
+var int curDayLowBar = na
+var float curWeekHigh = na
+var float curWeekLow = na
+var int curWeekHighBar = na
+var int curWeekLowBar = na
+
+var float pdh = na
+var float pdl = na
+var float pwh = na
+var float pwl = na
+
+var line pdhLine = na
+var line pdlLine = na
+var line pwhLine = na
+var line pwlLine = na
+var label pdhLabel = na
+var label pdlLabel = na
+var label pwhLabel = na
+var label pwlLabel = na
+
+if newDay
+    line.delete(pdhLine)
+    line.delete(pdlLine)
+    label.delete(pdhLabel)
+    label.delete(pdlLabel)
+    pdhLine := na
+    pdlLine := na
+    pdhLabel := na
+    pdlLabel := na
+
+    pdh := curDayHigh
+    pdl := curDayLow
+
+    if showPDH and not na(pdh)
+        pdhEnd = extendRight ? bar_index + labelOffsetBars : bar_index + extendBars
+        pdhLine := line.new(curDayHighBar, pdh, pdhEnd, pdh, color = pdhColor, width = lineWidth, extend = extend.none)
+        pdhLabel := label.new(bar_index + labelOffsetBars, pdh - labelOffsetPrice, pdhText, style = label.style_label_left, textcolor = labelTextColor, color = prevDayLabelColor, size = labelSize)
+        pdhLabel
+    if showPDL and not na(pdl)
+        pdlEnd = extendRight ? bar_index + labelOffsetBars : bar_index + extendBars
+        pdlLine := line.new(curDayLowBar, pdl, pdlEnd, pdl, color = pdlColor, width = lineWidth, extend = extend.none)
+        pdlLabel := label.new(bar_index + labelOffsetBars, pdl - labelOffsetPrice, pdlText, style = label.style_label_left, textcolor = labelTextColor, color = prevDayLabelColor, size = labelSize)
+        pdlLabel
+
+    curDayHigh := high
+    curDayLow := low
+    curDayHighBar := bar_index
+    curDayLowBar := bar_index
+    curDayLowBar
+else
+    if high >= nz(curDayHigh, high)
+        curDayHigh := high
+        curDayHighBar := bar_index
+        curDayHighBar
+    if low <= nz(curDayLow, low)
+        curDayLow := low
+        curDayLowBar := bar_index
+        curDayLowBar
+
+if newWeek
+    line.delete(pwhLine)
+    line.delete(pwlLine)
+    label.delete(pwhLabel)
+    label.delete(pwlLabel)
+    pwhLine := na
+    pwlLine := na
+    pwhLabel := na
+    pwlLabel := na
+
+    pwh := curWeekHigh
+    pwl := curWeekLow
+
+    if showPWH and not na(pwh)
+        pwhEnd = extendRight ? bar_index + labelOffsetBars : bar_index + extendBars
+        pwhLine := line.new(curWeekHighBar, pwh, pwhEnd, pwh, color = pwhColor, width = lineWidth, extend = extend.none)
+        pwhLabel := label.new(bar_index + labelOffsetBars, pwh - labelOffsetPrice, pwhText, style = label.style_label_left, textcolor = labelTextColor, color = prevWeekLabelColor, size = labelSize)
+        pwhLabel
+    if showPWL and not na(pwl)
+        pwlEnd = extendRight ? bar_index + labelOffsetBars : bar_index + extendBars
+        pwlLine := line.new(curWeekLowBar, pwl, pwlEnd, pwl, color = pwlColor, width = lineWidth, extend = extend.none)
+        pwlLabel := label.new(bar_index + labelOffsetBars, pwl - labelOffsetPrice, pwlText, style = label.style_label_left, textcolor = labelTextColor, color = prevWeekLabelColor, size = labelSize)
+        pwlLabel
+
+    curWeekHigh := high
+    curWeekLow := low
+    curWeekHighBar := bar_index
+    curWeekLowBar := bar_index
+    curWeekLowBar
+else
+    if high >= nz(curWeekHigh, high)
+        curWeekHigh := high
+        curWeekHighBar := bar_index
+        curWeekHighBar
+    if low <= nz(curWeekLow, low)
+        curWeekLow := low
+        curWeekLowBar := bar_index
+        curWeekLowBar
+// =======================================================================
+
+
+if extendRight
+    followEnd = bar_index + labelOffsetBars
+    if not na(asiaHighLine)
+        line.set_x2(asiaHighLine, followEnd)
+    if not na(asiaLowLine)
+        line.set_x2(asiaLowLine, followEnd)
+    if not na(londonHighLine)
+        line.set_x2(londonHighLine, followEnd)
+    if not na(londonLowLine)
+        line.set_x2(londonLowLine, followEnd)
+    if not na(midnightLine)
+        line.set_x2(midnightLine, followEnd)
+    if not na(open2Line)
+        line.set_x2(open2Line, followEnd)
+    if not na(pdhLine)
+        line.set_x2(pdhLine, followEnd)
+    if not na(pdlLine)
+        line.set_x2(pdlLine, followEnd)
+    if not na(pwhLine)
+        line.set_x2(pwhLine, followEnd)
+    if not na(pwlLine)
+        line.set_x2(pwlLine, followEnd)
+
+if not na(asiaHighLabel)
+    label.set_x(asiaHighLabel, bar_index + labelOffsetBars)
+    label.set_y(asiaHighLabel, asiaHigh - labelOffsetPrice)
+if not na(asiaLowLabel)
+    label.set_x(asiaLowLabel, bar_index + labelOffsetBars)
+    label.set_y(asiaLowLabel, asiaLow - labelOffsetPrice)
+if not na(londonHighLabel)
+    label.set_x(londonHighLabel, bar_index + labelOffsetBars)
+    label.set_y(londonHighLabel, londonHigh - labelOffsetPrice)
+if not na(londonLowLabel)
+    label.set_x(londonLowLabel, bar_index + labelOffsetBars)
+    label.set_y(londonLowLabel, londonLow - labelOffsetPrice)
+if not na(midnightLabel)
+    label.set_x(midnightLabel, bar_index + labelOffsetBars)
+    label.set_y(midnightLabel, midnightPrice - labelOffsetPrice)
+if not na(open2Label)
+    label.set_x(open2Label, bar_index + labelOffsetBars)
+    label.set_y(open2Label, open2Price - labelOffsetPrice)
+if not na(pdhLabel)
+    label.set_x(pdhLabel, bar_index + labelOffsetBars)
+if not na(pdlLabel)
+    label.set_x(pdlLabel, bar_index + labelOffsetBars)
+if not na(pwhLabel)
+    label.set_x(pwhLabel, bar_index + labelOffsetBars)
+if not na(pwlLabel)
+    label.set_x(pwlLabel, bar_index + labelOffsetBars)
+
+plotshape(asiaStart, title = 'Asia Start', style = shape.circle, location = location.bottom, size = size.tiny, color = color.new(asiaHighColor, 70), display = display.none)
+plotshape(londonStart, title = 'London Start', style = shape.circle, location = location.bottom, size = size.tiny, color = color.new(londonHighColor, 70), display = display.none)
+plotshape(midnightTrigger, title = 'Midnight Open Bar', style = shape.circle, location = location.bottom, size = size.tiny, color = color.new(midnightColor, 70), display = display.none)
+plotshape(open2Trigger, title = '08:30 Open Bar', style = shape.circle, location = location.bottom, size = size.tiny, color = color.new(open2Color, 70), display = display.none)
