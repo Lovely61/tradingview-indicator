@@ -1,50 +1,71 @@
 //@version=6
 indicator('ICT', overlay = true, max_lines_count = 50, max_labels_count = 50)
 
-asiaSession = input.session('1800-0150', 'Asia Session (NY Time)')
-londonSession = input.session('0200-0930', 'London Session (NY Time)')
-sessionTz = input.string('America/New_York', 'Session Time Zone')
-lineWidth = input.int(1, 'Line Width', minval = 1, maxval = 10)
+// ============================== ON / OFF ==============================
+grpToggles = 'On / Off'
 
-showAsiaHigh = input.bool(true, 'Show Asia High')
-showAsiaLow = input.bool(true, 'Show Asia Low')
-showLondonHigh = input.bool(true, 'Show London High')
-showLondonLow = input.bool(true, 'Show London Low')
+showAsiaHigh = input.bool(true, 'Asia High', group = grpToggles, inline = 'asia')
+showAsiaLow = input.bool(true, 'Asia Low', group = grpToggles, inline = 'asia')
+showLondonHigh = input.bool(true, 'London High', group = grpToggles, inline = 'london')
+showLondonLow = input.bool(true, 'London Low', group = grpToggles, inline = 'london')
+showMidnightOpen = input.bool(true, 'Midnight Open', group = grpToggles, inline = 'opens', tooltip = 'Price at the Midnight Open and 08:30 Open (NY), extended right')
+showOpen2 = input.bool(true, '08:30 Open', group = grpToggles, inline = 'opens')
+showPDH = input.bool(true, 'Prev Day High', group = grpToggles, inline = 'pd')
+showPDL = input.bool(true, 'Prev Day Low', group = grpToggles, inline = 'pd')
+showPWH = input.bool(true, 'Prev Week High', group = grpToggles, inline = 'pw')
+showPWL = input.bool(true, 'Prev Week Low', group = grpToggles, inline = 'pw')
+extendRight = input.bool(true, 'Extend Lines To The Right', group = grpToggles, tooltip = 'On = lines follow price and end where the text sits. Off = lines stop a fixed number of bars after the RTH open.')
+showLabelBackground = input.bool(false, 'Show Label Background', group = grpToggles)
+// ======================================================================
 
-extendRight = input.bool(true, "Extend Lines To The Right", tooltip = "On = lines follow price and end where the text sits. Off = lines stop a fixed number of bars after the RTH open.")
-extendBars  = input.int(120, "Line Length After RTH Open (Bars)", minval = 1, maxval = 1000, tooltip = "Only used when Extend Lines To The Right is off")
 
-asiaHighColor = input.color(color.new(color.teal, 0), 'Asia High Color')
-asiaLowColor = input.color(color.new(color.teal, 0), 'Asia Low Color')
-londonHighColor = input.color(color.new(color.orange, 0), 'London High Color')
-londonLowColor = input.color(color.new(color.orange, 0), 'London Low Color')
+// ============================== GENERAL ===============================
+grpGeneral = 'General'
 
-asiaHighText = input.string('Asia High', 'Asia High Text')
-asiaLowText = input.string('Asia Low', 'Asia Low Text')
-londonHighText = input.string('London High', 'London High Text')
-londonLowText = input.string('London Low', 'London Low Text')
+asiaSession = input.session('1800-0150', 'Asia Session (NY Time)', group = grpGeneral)
+londonSession = input.session('0200-0930', 'London Session (NY Time)', group = grpGeneral)
+sessionTz = input.string('America/New_York', 'Session Time Zone', group = grpGeneral)
+lineWidth = input.int(1, 'Line Width', minval = 1, maxval = 10, group = grpGeneral)
+extendBars = input.int(120, 'Line Length After RTH Open (Bars)', minval = 1, maxval = 1000, group = grpGeneral, tooltip = 'Only used when Extend Lines To The Right is off')
+// ======================================================================
 
-labelTextColor = input.color(color.rgb(66, 64, 64), 'Label Text Color')
-labelSizeInput = input.int(2, 'Label Size: 0=tiny, 1=small, 2=normal, 3=large, 4=huge', minval = 0, maxval = 4)
-showLabelBackground = input.bool(false, 'Show Label Background')
-asiaLabelBgColor = input.color(color.new(color.teal, 0), 'Asia Label Background')
-londonLabelBgColor = input.color(color.new(color.orange, 0), 'London Label Background')
-labelOffsetTicks = input.int(0, 'Label Offset Below Line (Ticks)', minval = 0)
-labelOffsetBars = input.int(40, 'Label Distance Right Of Last Bar (Bars)', minval = 0, maxval = 500, tooltip = 'How far to the right of the current bar the text sits. 0 = right on the last bar.')
 
+// ============================== LABELS ================================
+grpLabels = 'Labels'
+
+labelTextColor = input.color(color.rgb(66, 64, 64), 'Label Text Color', group = grpLabels)
+labelSizeInput = input.int(2, 'Label Size: 0=tiny, 1=small, 2=normal, 3=large, 4=huge', minval = 0, maxval = 4, group = grpLabels)
+labelOffsetTicks = input.int(0, 'Label Offset Below Line (Ticks)', minval = 0, group = grpLabels)
+labelOffsetBars = input.int(40, 'Label Distance Right Of Last Bar (Bars)', minval = 0, maxval = 500, group = grpLabels, tooltip = 'How far to the right of the current bar the text sits. 0 = right on the last bar.')
+// ======================================================================
+
+
+// =========================== ASIA / LONDON ============================
+grpSessions = 'Asia / London'
+
+asiaHighColor = input.color(color.new(color.teal, 0), 'Asia High Color', group = grpSessions)
+asiaLowColor = input.color(color.new(color.teal, 0), 'Asia Low Color', group = grpSessions)
+asiaHighText = input.string('Asia High', 'Asia High Text', group = grpSessions)
+asiaLowText = input.string('Asia Low', 'Asia Low Text', group = grpSessions)
+asiaLabelBgColor = input.color(color.new(color.teal, 0), 'Asia Label Background', group = grpSessions)
+
+londonHighColor = input.color(color.new(color.orange, 0), 'London High Color', group = grpSessions)
+londonLowColor = input.color(color.new(color.orange, 0), 'London Low Color', group = grpSessions)
+londonHighText = input.string('London High', 'London High Text', group = grpSessions)
+londonLowText = input.string('London Low', 'London Low Text', group = grpSessions)
+londonLabelBgColor = input.color(color.new(color.orange, 0), 'London Label Background', group = grpSessions)
+// ======================================================================
 
 
 // ============================== NY OPENS ==============================
 grpOpens = 'NY Opens'
 
-showMidnightOpen = input.bool(true, 'Show Midnight Open (00:00 NY)', group = grpOpens, tooltip = 'Price at the 00:00 New York open, extended right')
 midnightHour = input.int(0, 'Midnight Open Hour (NY)', minval = 0, maxval = 23, group = grpOpens)
 midnightMinute = input.int(0, 'Midnight Open Minute', minval = 0, maxval = 59, group = grpOpens)
 midnightColor = input.color(color.new(#7eceb6, 0), 'Midnight Open Color', group = grpOpens)
 midnightText = input.string('Midnight Open', 'Midnight Open Text', group = grpOpens)
 midnightBgColor = input.color(color.new(#99dec9, 0), 'Midnight Label Background', group = grpOpens)
 
-showOpen2 = input.bool(true, 'Show 08:30 Open (NY)', group = grpOpens, tooltip = 'Price at the 08:30 New York open, extended right')
 open2Hour = input.int(8, '08:30 Open Hour (NY)', minval = 0, maxval = 23, group = grpOpens)
 open2Minute = input.int(30, '08:30 Open Minute', minval = 0, maxval = 59, group = grpOpens)
 open2Color = input.color(color.new(#4075d1, 0), '08:30 Open Color', group = grpOpens)
@@ -58,11 +79,6 @@ openLineStyleInput = input.string('Dashed', 'Open Line Style', options = ['Solid
 
 // ======================= PREVIOUS DAY / WEEK ==========================
 grpPrev = 'Previous Day / Week'
-
-showPDH = input.bool(true, 'Show Previous Day High', group = grpPrev)
-showPDL = input.bool(true, 'Show Previous Day Low', group = grpPrev)
-showPWH = input.bool(true, 'Show Previous Week High', group = grpPrev)
-showPWL = input.bool(true, 'Show Previous Week Low', group = grpPrev)
 
 pdhColor = input.color(color.new(#27b06c, 0), 'Previous Day High Color', group = grpPrev)
 pdlColor = input.color(color.new(#27b06c, 0), 'Previous Day Low Color', group = grpPrev)
