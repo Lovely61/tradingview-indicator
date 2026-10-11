@@ -1,0 +1,166 @@
+//@version=6
+// ATM Range Windows
+//   London Session ATM Range = 12:00AM to 2:00AM EST
+//   Asia   Session ATM Range = 6:00PM to 8:00PM EST
+//   AM     Session ATM Range = 7:00AM to 9:30AM EST
+//   PM     Session ATM Range = 11:30AM to 1:30PM EST
+// Marks the high and low of each ATM range. Times, colors, widths and line styles are all adjustable.
+indicator("ATM", overlay = true, max_lines_count = 100, max_labels_count = 100)
+
+// ============================== ON / OFF ==============================
+grpToggles = "On / Off"
+
+showLondon          = input.bool(true, "London ATM Range", group = grpToggles)
+showAsia            = input.bool(true, "Asia ATM Range", group = grpToggles)
+showAm              = input.bool(true, "AM ATM Range", group = grpToggles)
+showPm              = input.bool(true, "PM ATM Range", group = grpToggles)
+showLabels          = input.bool(true, "Show Labels", group = grpToggles)
+showLabelBackground = input.bool(false, "Show Label Background", group = grpToggles)
+extendRight         = input.bool(true, "Extend Lines To The Right", group = grpToggles, tooltip = "On = the line follows price and ends where the text sits. Off = the line stops a fixed number of bars after the range closes, with the text at that end.")
+
+// ============================== GENERAL ==============================
+grpGen    = "General"
+sessionTz = input.string("America/New_York", "Time Zone", group = grpGen)
+
+extendBars  = input.int(60, "Line Length After Range (Bars)", minval = 1, maxval = 500, group = grpGen, tooltip = "Only used when Extend Lines To The Right is off")
+
+// line settings - shared by London, Asia, AM and PM
+lineWidthInput = input.int(1, "Line Width", minval = 1, maxval = 10, group = grpGen)
+lineStyleInput = input.string("Solid", "Line Style", options = ["Solid", "Dashed", "Dotted"], group = grpGen)
+
+// text settings - shared by London, Asia, AM and PM
+labelTextColor      = input.color(color.rgb(103, 105, 111), "Label Text Color", group = grpGen)
+labelBgColor        = input.color(color.new(color.gray, 70), "Label Background Color", group = grpGen)
+textSizeInput       = input.int(2, "Text Size: 0=tiny, 1=small, 2=normal, 3=large, 4=huge", minval = 0, maxval = 4, group = grpGen)
+textHeightTicks     = input.int(0, "Text Height (Ticks From Line)", minval = -1000, maxval = 1000, group = grpGen, tooltip = "High text sits this far above its line, low text the same below. Negative flips them inside the range.")
+textDistBars        = input.int(23, "Text Distance (Bars)", minval = 0, maxval = 500, group = grpGen, tooltip = "Gap between the current bar and the end of the line, where the text sits.")
+
+// =========================== LONDON SESSION ===========================
+grpLondon        = "London Session  (12:00AM - 2:00AM)"
+londonSess       = input.session("0000-0200", "London ATM Range (NY)", group = grpLondon)
+londonHighColor  = input.color(color.new(color.black, 0), "London High Color", group = grpLondon)
+londonLowColor   = input.color(color.new(color.black, 0), "London Low Color", group = grpLondon)
+londonHighText   = input.string("LONDON ATM HIGH", "London High Text", group = grpLondon)
+londonLowText    = input.string("LONDON ATM LOW", "London Low Text", group = grpLondon)
+
+// ============================ ASIA SESSION ============================
+grpAsia        = "Asia Session  (6:00PM - 8:00PM)"
+asiaSess       = input.session("1800-2000", "Asia ATM Range (NY)", group = grpAsia)
+asiaHighColor  = input.color(color.new(color.black, 0), "Asia High Color", group = grpAsia)
+asiaLowColor   = input.color(color.new(color.black, 0), "Asia Low Color", group = grpAsia)
+asiaHighText   = input.string("ASIA ATM HIGH", "Asia High Text", group = grpAsia)
+asiaLowText    = input.string("ASIA ATM LOW", "Asia Low Text", group = grpAsia)
+
+// ============================= AM SESSION =============================
+grpAm        = "AM Session  (7:00AM - 9:30AM)"
+amSess       = input.session("0700-0930", "AM ATM Range (NY)", group = grpAm)
+amHighColor  = input.color(color.new(color.black, 0), "AM High Color", group = grpAm)
+amLowColor   = input.color(color.new(color.black, 0), "AM Low Color", group = grpAm)
+amHighText   = input.string("AM ATM HIGH", "AM High Text", group = grpAm)
+amLowText    = input.string("AM ATM LOW", "AM Low Text", group = grpAm)
+
+// ============================= PM SESSION =============================
+grpPm        = "PM Session  (11:30AM - 1:30PM)"
+pmSess       = input.session("1130-1330", "PM ATM Range (NY)", group = grpPm)
+pmHighColor  = input.color(color.new(color.black, 0), "PM High Color", group = grpPm)
+pmLowColor   = input.color(color.new(color.black, 0), "PM Low Color", group = grpPm)
+pmHighText   = input.string("PM ATM HIGH", "PM High Text", group = grpPm)
+pmLowText    = input.string("PM ATM LOW", "PM Low Text", group = grpPm)
+// ======================================================================
+
+toStyle(s) =>
+    s == "Solid" ? line.style_solid : s == "Dashed" ? line.style_dashed : line.style_dotted
+
+toSize(n) =>
+    n == 0 ? size.tiny : n == 1 ? size.small : n == 2 ? size.normal : n == 3 ? size.large : size.huge
+
+labelBg         = showLabelBackground ? labelBgColor : color.new(color.white, 100)
+atmLineStyle    = toStyle(lineStyleInput)
+atmLabelSize    = toSize(textSizeInput)
+textOffsetPrice = syminfo.mintick * textHeightTicks
+
+inLondon = not na(time(timeframe.period, londonSess, sessionTz))
+inAsia   = not na(time(timeframe.period, asiaSess, sessionTz))
+inAm     = not na(time(timeframe.period, amSess, sessionTz))
+inPm     = not na(time(timeframe.period, pmSess, sessionTz))
+
+// One engine, four call sites - each call site keeps its own independent state.
+atmRange(inRange, show, highColor, lowColor, highTxt, lowTxt) =>
+    var float atmHigh   = na
+    var float atmLow    = na
+    var int   highBar   = na
+    var int   lowBar    = na
+    var int   endBar    = na
+    var line  highLine  = na
+    var line  lowLine   = na
+    var label highLabel = na
+    var label lowLabel  = na
+
+    rangeStart = inRange and not inRange[1]
+    rangeEnd   = not inRange and inRange[1]
+
+    if rangeStart
+        line.delete(highLine)
+        line.delete(lowLine)
+        label.delete(highLabel)
+        label.delete(lowLabel)
+
+        highLine  := na
+        lowLine   := na
+        highLabel := na
+        lowLabel  := na
+
+        atmHigh := high
+        atmLow  := low
+        highBar := bar_index
+        lowBar  := bar_index
+    else if inRange
+        // remember the exact bar the extreme was made on
+        if na(atmHigh) or high > atmHigh
+            atmHigh := high
+            highBar := bar_index
+        if na(atmLow) or low < atmLow
+            atmLow := low
+            lowBar := bar_index
+
+    // levels are fixed the moment the range closes - each line starts on the bar that made the extreme
+    if rangeEnd and show and not na(atmHigh) and not na(atmLow)
+        endBar := extendRight ? bar_index + textDistBars : bar_index + extendBars
+
+        highLine := line.new(highBar, atmHigh, endBar, atmHigh, color = highColor, width = lineWidthInput, style = atmLineStyle)
+        lowLine  := line.new(lowBar, atmLow, endBar, atmLow, color = lowColor, width = lineWidthInput, style = atmLineStyle)
+
+        if showLabels
+            highLabel := label.new(endBar, atmHigh + textOffsetPrice, highTxt, style = label.style_label_left, textcolor = labelTextColor, color = labelBg, size = atmLabelSize)
+            lowLabel  := label.new(endBar, atmLow - textOffsetPrice, lowTxt, style = label.style_label_left, textcolor = labelTextColor, color = labelBg, size = atmLabelSize)
+
+    // the line runs right up to where the text sits and stops there
+    if extendRight and not na(highLine)
+        endBar := bar_index + textDistBars
+        line.set_x2(highLine, endBar)
+        line.set_x2(lowLine, endBar)
+
+    if not na(highLabel)
+        label.set_x(highLabel, nz(endBar, bar_index))
+        label.set_y(highLabel, atmHigh + textOffsetPrice)
+        label.set_size(highLabel, atmLabelSize)
+    if not na(lowLabel)
+        label.set_x(lowLabel, nz(endBar, bar_index))
+        label.set_y(lowLabel, atmLow - textOffsetPrice)
+        label.set_size(lowLabel, atmLabelSize)
+
+    [atmHigh, atmLow]
+
+[londonHigh, londonLow] = atmRange(inLondon, showLondon, londonHighColor, londonLowColor, londonHighText, londonLowText)
+[asiaHigh, asiaLow]     = atmRange(inAsia, showAsia, asiaHighColor, asiaLowColor, asiaHighText, asiaLowText)
+[amHigh, amLow]         = atmRange(inAm, showAm, amHighColor, amLowColor, amHighText, amLowText)
+[pmHigh, pmLow]         = atmRange(inPm, showPm, pmHighColor, pmLowColor, pmHighText, pmLowText)
+
+plot(showLondon ? londonHigh : na, "London ATM High", color = color.new(londonHighColor, 100), display = display.data_window)
+plot(showLondon ? londonLow : na, "London ATM Low", color = color.new(londonLowColor, 100), display = display.data_window)
+plot(showAsia ? asiaHigh : na, "Asia ATM High", color = color.new(asiaHighColor, 100), display = display.data_window)
+plot(showAsia ? asiaLow : na, "Asia ATM Low", color = color.new(asiaLowColor, 100), display = display.data_window)
+plot(showAm ? amHigh : na, "AM ATM High", color = color.new(amHighColor, 100), display = display.data_window)
+plot(showAm ? amLow : na, "AM ATM Low", color = color.new(amLowColor, 100), display = display.data_window)
+plot(showPm ? pmHigh : na, "PM ATM High", color = color.new(pmHighColor, 100), display = display.data_window)
+plot(showPm ? pmLow : na, "PM ATM Low", color = color.new(pmLowColor, 100), display = display.data_window)
