@@ -1,0 +1,106 @@
+//@version=6
+// Fair Value Gaps on the chart's current timeframe.
+// When candle 1 and candle 3 bodies also have a gap, the box is drawn body to body instead of wick to wick.
+indicator("FVG", overlay = true, max_boxes_count = 500, max_lines_count = 500)
+
+// ============================== ON / OFF ==============================
+grpToggles = "On / Off"
+
+showBull     = input.bool(true, "Bullish FVG", group = grpToggles)
+showBear     = input.bool(true, "Bearish FVG", group = grpToggles)
+useBody      = input.bool(true, "Mark From Candle Bodies", group = grpToggles, tooltip = "When the bodies of candle 1 and candle 3 have a gap, the box is drawn from body to body. Off = always wick to wick.")
+bodyOnly     = input.bool(false, "Also Mark Body-Only Gaps", group = grpToggles, tooltip = "Also mark a gap between the bodies of candle 1 and candle 3 when their wicks overlap.")
+showCE       = input.bool(true, "Show Midline (CE)", group = grpToggles)
+showText     = input.bool(true, "Show FVG Text", group = grpToggles)
+extendRight  = input.bool(true, "Extend Until Filled", group = grpToggles, tooltip = "On = the box extends right until price fills it. Off = the box is a fixed number of bars long.")
+removeFilled = input.bool(true, "Remove Filled FVGs", group = grpToggles)
+
+// ============================== GENERAL ===============================
+grpGen = "General"
+
+fillMode   = input.string("Wick", "Filled When", options = ["Wick", "Close"], group = grpGen, tooltip = "Wick = price trades through the whole gap. Close = a candle closes beyond the gap.")
+maxFvgs    = input.int(20, "Max FVGs On Chart", minval = 1, maxval = 250, group = grpGen)
+minTicks   = input.int(0, "Min FVG Size (Ticks)", minval = 0, group = grpGen)
+extendBars = input.int(20, "Box Length (Bars)", minval = 1, maxval = 500, group = grpGen, tooltip = "Only used when Extend Until Filled is off")
+
+// =============================== STYLE ================================
+grpStyle = "Style"
+
+bullColor    = input.color(color.new(color.green, 80), "Bullish FVG Color", group = grpStyle)
+bullBorder   = input.color(color.new(color.green, 100), "Bullish Border Color", group = grpStyle)
+bearColor    = input.color(color.new(color.red, 80), "Bearish FVG Color", group = grpStyle)
+bearBorder   = input.color(color.new(color.red, 100), "Bearish Border Color", group = grpStyle)
+ceColor      = input.color(color.new(color.gray, 0), "Midline Color", group = grpStyle)
+ceStyleInput = input.string("Dashed", "Midline Style", options = ["Solid", "Dashed", "Dotted"], group = grpStyle)
+bullText     = input.string("Bull FVG", "Bullish Text", group = grpStyle)
+bearText     = input.string("Bear FVG", "Bearish Text", group = grpStyle)
+textColor    = input.color(color.rgb(103, 105, 111), "Text Color", group = grpStyle)
+textSizeIn   = input.int(1, "Text Size: 0=tiny, 1=small, 2=normal, 3=large, 4=huge", minval = 0, maxval = 4, group = grpStyle)
+// ======================================================================
+
+type Fvg
+    box   zone
+    line  ce
+    bool  bull
+    float top
+    float bot
+    bool  active = true
+
+var array<Fvg> fvgs = array.new<Fvg>()
+
+ceStyle = ceStyleInput == "Solid" ? line.style_solid : ceStyleInput == "Dashed" ? line.style_dashed : line.style_dotted
+txtSize = textSizeIn == 0 ? size.tiny : textSizeIn == 1 ? size.small : textSizeIn == 2 ? size.normal : textSizeIn == 3 ? size.large : size.huge
+minSize = minTicks * syminfo.mintick
+
+bodyTop0 = math.max(open, close)
+bodyBot0 = math.min(open, close)
+bodyTop2 = math.max(open[2], close[2])
+bodyBot2 = math.min(open[2], close[2])
+
+wickBull = low > high[2]
+bodyBull = bodyBot0 > bodyTop2
+wickBear = high < low[2]
+bodyBear = bodyTop0 < bodyBot2
+
+newFvg(bool bull, float top, float bot) =>
+    right = extendRight ? bar_index : bar_index + extendBars
+    zone = box.new(bar_index - 2, top, right, bot, border_color = bull ? bullBorder : bearBorder, bgcolor = bull ? bullColor : bearColor, text = showText ? (bull ? bullText : bearText) : "", text_color = textColor, text_size = txtSize, text_halign = text.align_right)
+    mid = (top + bot) / 2
+    line ce = showCE ? line.new(bar_index - 2, mid, right, mid, color = ceColor, style = ceStyle) : na
+    fvgs.push(Fvg.new(zone, ce, bull, top, bot))
+    if fvgs.size() > maxFvgs
+        old = fvgs.shift()
+        box.delete(old.zone)
+        line.delete(old.ce)
+
+// only confirmed (closed) candles create an FVG, so boxes don't flicker on the live bar
+if barstate.isconfirmed and not na(high[2])
+    if showBull and (wickBull or (bodyOnly and bodyBull))
+        fromBody = useBody or not wickBull
+        top = fromBody ? bodyBot0 : low
+        bot = fromBody ? bodyTop2 : high[2]
+        if top - bot > minSize
+            newFvg(true, top, bot)
+    if showBear and (wickBear or (bodyOnly and bodyBear))
+        fromBody = useBody or not wickBear
+        top = fromBody ? bodyBot2 : low[2]
+        bot = fromBody ? bodyTop0 : high
+        if top - bot > minSize
+            newFvg(false, top, bot)
+
+// extend open FVGs and stop / remove them once price fills them
+if fvgs.size() > 0
+    for i = fvgs.size() - 1 to 0
+        f = fvgs.get(i)
+        if f.active
+            if extendRight
+                box.set_right(f.zone, bar_index)
+                if not na(f.ce)
+                    line.set_x2(f.ce, bar_index)
+            filled = f.bull ? (fillMode == "Wick" ? low <= f.bot : close < f.bot) : (fillMode == "Wick" ? high >= f.top : close > f.top)
+            if filled
+                f.active := false
+                if removeFilled
+                    box.delete(f.zone)
+                    line.delete(f.ce)
+                    fvgs.remove(i)
