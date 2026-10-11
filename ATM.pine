@@ -37,7 +37,14 @@ textDistBars        = input.int(23, "Text Distance (Bars)", minval = 0, maxval =
 
 // =========================== LONDON SESSION ===========================
 grpLondon        = "London Session  (12:00AM - 2:00AM)"
-londonSess       = input.session("0000-0200", "London ATM Range (NY)", group = grpLondon)
+sessStr(sh, sm, eh, em) =>
+    str.tostring(sh, "00") + str.tostring(sm, "00") + "-" + str.tostring(eh, "00") + str.tostring(em, "00")
+
+londonSessStartH = input.int(0, "London ATM Range Start (NY)", minval = 0, maxval = 23, group = grpLondon, inline = "londonSessStart")
+londonSessStartM = input.int(0, ":", minval = 0, maxval = 59, group = grpLondon, inline = "londonSessStart")
+londonSessEndH = input.int(2, "London ATM Range End (NY)", minval = 0, maxval = 23, group = grpLondon, inline = "londonSessEnd")
+londonSessEndM = input.int(0, ":", minval = 0, maxval = 59, group = grpLondon, inline = "londonSessEnd")
+londonSess = sessStr(londonSessStartH, londonSessStartM, londonSessEndH, londonSessEndM)
 londonHighColor  = input.color(color.new(color.black, 0), "London High Color", group = grpLondon)
 londonLowColor   = input.color(color.new(color.black, 0), "London Low Color", group = grpLondon)
 londonHighText   = input.string("LONDON ATM HIGH", "London High Text", group = grpLondon)
@@ -45,7 +52,11 @@ londonLowText    = input.string("LONDON ATM LOW", "London Low Text", group = grp
 
 // ============================ ASIA SESSION ============================
 grpAsia        = "Asia Session  (6:00PM - 8:00PM)"
-asiaSess       = input.session("1800-2000", "Asia ATM Range (NY)", group = grpAsia)
+asiaSessStartH = input.int(18, "Asia ATM Range Start (NY)", minval = 0, maxval = 23, group = grpAsia, inline = "asiaSessStart")
+asiaSessStartM = input.int(0, ":", minval = 0, maxval = 59, group = grpAsia, inline = "asiaSessStart")
+asiaSessEndH = input.int(20, "Asia ATM Range End (NY)", minval = 0, maxval = 23, group = grpAsia, inline = "asiaSessEnd")
+asiaSessEndM = input.int(0, ":", minval = 0, maxval = 59, group = grpAsia, inline = "asiaSessEnd")
+asiaSess = sessStr(asiaSessStartH, asiaSessStartM, asiaSessEndH, asiaSessEndM)
 asiaHighColor  = input.color(color.new(color.black, 0), "Asia High Color", group = grpAsia)
 asiaLowColor   = input.color(color.new(color.black, 0), "Asia Low Color", group = grpAsia)
 asiaHighText   = input.string("ASIA ATM HIGH", "Asia High Text", group = grpAsia)
@@ -53,7 +64,11 @@ asiaLowText    = input.string("ASIA ATM LOW", "Asia Low Text", group = grpAsia)
 
 // ============================= AM SESSION =============================
 grpAm        = "AM Session  (7:00AM - 9:30AM)"
-amSess       = input.session("0700-0930", "AM ATM Range (NY)", group = grpAm)
+amSessStartH = input.int(7, "AM ATM Range Start (NY)", minval = 0, maxval = 23, group = grpAm, inline = "amSessStart")
+amSessStartM = input.int(0, ":", minval = 0, maxval = 59, group = grpAm, inline = "amSessStart")
+amSessEndH = input.int(9, "AM ATM Range End (NY)", minval = 0, maxval = 23, group = grpAm, inline = "amSessEnd")
+amSessEndM = input.int(30, ":", minval = 0, maxval = 59, group = grpAm, inline = "amSessEnd")
+amSess = sessStr(amSessStartH, amSessStartM, amSessEndH, amSessEndM)
 amHighColor  = input.color(color.new(color.black, 0), "AM High Color", group = grpAm)
 amLowColor   = input.color(color.new(color.black, 0), "AM Low Color", group = grpAm)
 amHighText   = input.string("AM ATM HIGH", "AM High Text", group = grpAm)
@@ -61,7 +76,11 @@ amLowText    = input.string("AM ATM LOW", "AM Low Text", group = grpAm)
 
 // ============================= PM SESSION =============================
 grpPm        = "PM Session  (11:30AM - 1:30PM)"
-pmSess       = input.session("1130-1330", "PM ATM Range (NY)", group = grpPm)
+pmSessStartH = input.int(11, "PM ATM Range Start (NY)", minval = 0, maxval = 23, group = grpPm, inline = "pmSessStart")
+pmSessStartM = input.int(30, ":", minval = 0, maxval = 59, group = grpPm, inline = "pmSessStart")
+pmSessEndH = input.int(13, "PM ATM Range End (NY)", minval = 0, maxval = 23, group = grpPm, inline = "pmSessEnd")
+pmSessEndM = input.int(30, ":", minval = 0, maxval = 59, group = grpPm, inline = "pmSessEnd")
+pmSess = sessStr(pmSessStartH, pmSessStartM, pmSessEndH, pmSessEndM)
 pmHighColor  = input.color(color.new(color.black, 0), "PM High Color", group = grpPm)
 pmLowColor   = input.color(color.new(color.black, 0), "PM Low Color", group = grpPm)
 pmHighText   = input.string("PM ATM HIGH", "PM High Text", group = grpPm)

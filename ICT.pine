@@ -22,8 +22,19 @@ showLabelBackground = input.bool(false, 'Show Label Background', group = grpTogg
 // ============================== GENERAL ===============================
 grpGeneral = 'General'
 
-asiaSession = input.session('1800-0150', 'Asia Session (NY Time)', group = grpGeneral)
-londonSession = input.session('0200-0930', 'London Session (NY Time)', group = grpGeneral)
+sessStr(sh, sm, eh, em) =>
+    str.tostring(sh, '00') + str.tostring(sm, '00') + '-' + str.tostring(eh, '00') + str.tostring(em, '00')
+
+asiaSessionStartH = input.int(18, 'Asia Session Start (NY)', minval = 0, maxval = 23, group = grpGeneral, inline = 'asiaSessionStart')
+asiaSessionStartM = input.int(0, ':', minval = 0, maxval = 59, group = grpGeneral, inline = 'asiaSessionStart')
+asiaSessionEndH = input.int(1, 'Asia Session End (NY)', minval = 0, maxval = 23, group = grpGeneral, inline = 'asiaSessionEnd')
+asiaSessionEndM = input.int(50, ':', minval = 0, maxval = 59, group = grpGeneral, inline = 'asiaSessionEnd')
+asiaSession = sessStr(asiaSessionStartH, asiaSessionStartM, asiaSessionEndH, asiaSessionEndM)
+londonSessionStartH = input.int(2, 'London Session Start (NY)', minval = 0, maxval = 23, group = grpGeneral, inline = 'londonSessionStart')
+londonSessionStartM = input.int(0, ':', minval = 0, maxval = 59, group = grpGeneral, inline = 'londonSessionStart')
+londonSessionEndH = input.int(9, 'London Session End (NY)', minval = 0, maxval = 23, group = grpGeneral, inline = 'londonSessionEnd')
+londonSessionEndM = input.int(30, ':', minval = 0, maxval = 59, group = grpGeneral, inline = 'londonSessionEnd')
+londonSession = sessStr(londonSessionStartH, londonSessionStartM, londonSessionEndH, londonSessionEndM)
 sessionTz = input.string('America/New_York', 'Session Time Zone', group = grpGeneral)
 lineWidth = input.int(1, 'Line Width', minval = 1, maxval = 10, group = grpGeneral)
 extendBars = input.int(120, 'Line Length After RTH Open (Bars)', minval = 1, maxval = 1000, group = grpGeneral, tooltip = 'Only used when Extend Lines To The Right is off')
