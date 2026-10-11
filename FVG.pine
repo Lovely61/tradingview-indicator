@@ -13,12 +13,11 @@ bodyOnly     = input.bool(false, "Also Mark Body-Only Gaps", group = grpToggles,
 showCE       = input.bool(true, "Show Midline (CE)", group = grpToggles)
 showText     = input.bool(true, "Show FVG Text", group = grpToggles)
 extendRight  = input.bool(true, "Extend Until Filled", group = grpToggles, tooltip = "On = the box extends right until price fills it. Off = the box is a fixed number of bars long.")
-removeFilled = input.bool(true, "Remove Filled FVGs", group = grpToggles)
+removeFilled = input.bool(true, "Remove Filled FVGs", group = grpToggles, tooltip = "An FVG only counts as filled when a candle body trades through the entire gap. Wicks through the gap don't count.")
 
 // ============================== GENERAL ===============================
 grpGen = "General"
 
-fillMode   = input.string("Wick", "Filled When", options = ["Wick", "Close"], group = grpGen, tooltip = "Wick = price trades through the whole gap. Close = a candle closes beyond the gap.")
 maxFvgs    = input.int(20, "Max FVGs On Chart", minval = 1, maxval = 250, group = grpGen)
 minTicks   = input.int(0, "Min FVG Size (Ticks)", minval = 0, group = grpGen)
 extendBars = input.int(20, "Box Length (Bars)", minval = 1, maxval = 500, group = grpGen, tooltip = "Only used when Extend Until Filled is off")
@@ -97,7 +96,8 @@ if fvgs.size() > 0
                 box.set_right(f.zone, bar_index)
                 if not na(f.ce)
                     line.set_x2(f.ce, bar_index)
-            filled = f.bull ? (fillMode == "Wick" ? low <= f.bot : close < f.bot) : (fillMode == "Wick" ? high >= f.top : close > f.top)
+            // filled only when a candle body covers the whole gap - wicks alone don't count
+            filled = f.bull ? bodyBot0 <= f.bot : bodyTop0 >= f.top
             if filled
                 f.active := false
                 if removeFilled
